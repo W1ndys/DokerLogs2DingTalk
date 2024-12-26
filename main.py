@@ -7,14 +7,19 @@ import hashlib
 import base64
 import urllib.parse
 import logging
-
+import re
+from datetime import datetime
 
 def get_container_logs(container_name, num_lines):
     client = docker.from_env()
     try:
         container = client.containers.get(container_name)
         logs = container.logs(tail=num_lines)
-        return logs.decode("utf-8")
+        simplified_logs = "\n".join(
+            "【隐藏的info日志】" if re.search(r"\[32minfo.*\[39m\]", line) else line
+            for line in logs.decode("utf-8").splitlines()
+        )
+        return simplified_logs
     except docker.errors.NotFound:
         return f"容器 '{container_name}' 不存在."
     except Exception as e:
@@ -53,15 +58,20 @@ def send_dingtalk_message(text, desp, dingtalk_token, dingtalk_secret):
     return response.json()
 
 
-# 示例用法
+# 获取容器日志
 container_name = "napcat"
-num_lines = 10
+num_lines = 5
 logs = get_container_logs(container_name, num_lines)
 print(logs)
 
-# 钉钉推送示例
+# 钉钉推送
 dingtalk_token = "0c0ad4540eed1d1eab06d7229a573146430e6a8b5429eb4e3ada81e039987f6c"
 dingtalk_secret = "SEC1000ac85e635258597301a211cde38a94644e10f473b110af6f2463e6008e441"
 message = f"容器 '{container_name}' 的日志"
 description = logs
+
+# 当前时间
+current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+print(f"当前时间：{current_time}")
+description = f"{current_time}\n{description}"
 send_dingtalk_message(message, description, dingtalk_token, dingtalk_secret)
