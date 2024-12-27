@@ -1,1 +1,5 @@
 docker
+requests
+logging
+re
+datetime
