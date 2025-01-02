@@ -10,15 +10,30 @@ import logging
 import re
 from datetime import datetime
 
+
 def get_container_logs(container_name, num_lines):
     client = docker.from_env()
     try:
         container = client.containers.get(container_name)
         logs = container.logs(tail=num_lines)
-        simplified_logs = "\n".join(
-            "【隐藏的info日志】" if re.search(r"\[32minfo.*\[39m\]", line) else line
-            for line in logs.decode("utf-8").splitlines()
-        )
+        log_lines = logs.decode("utf-8").splitlines()
+
+        error_logs = []
+        current_error = []
+
+        for line in log_lines:
+            if re.search(r"\[error\]", line):
+                if current_error:
+                    error_logs.append("\n".join(current_error))
+                current_error = [line]
+            elif current_error:
+                current_error.append(line)
+
+        if current_error:
+            error_logs.append("\n".join(current_error))
+
+        # 只保留最近100条错误信息
+        simplified_logs = "\n\n".join(error_logs[-100:])
         return simplified_logs
     except docker.errors.NotFound:
         return f"容器 '{container_name}' 不存在."
